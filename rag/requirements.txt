@@ -1,0 +1,22 @@
+# ArchAI RAG — requirements.txt
+# Install with: pip install -r requirements.txt
+
+# ── Web framework ─────────────────────────────────────────────────────────
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+pydantic>=2.7.0
+
+# ── LLM providers (install what you use) ─────────────────────────────────
+# Ollama — no pip package needed, just run: https://ollama.com
+groq>=0.9.0                   # Free API tier — recommended for fast responses
+openai>=1.30.0                # Optional — paid
+
+# ── Vector DB (already used by scraper — keep versions in sync) ───────────
+chromadb>=0.5.0
+sentence-transformers>=2.7.0  # Used as embedding fallback
+
+# ── HTTP (for Ollama calls) ───────────────────────────────────────────────
+requests>=2.31.0
+
+# ── Utilities ─────────────────────────────────────────────────────────────
+python-dotenv>=1.0.0

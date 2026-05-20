@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ArchAI · Architectural Decision Engine</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<style>
+  body { font-family: 'Inter', -apple-system, system-ui, sans-serif; }
+  .mono { font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', monospace; }
+  .scroll-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+  .scroll-thin::-webkit-scrollbar-track { background: transparent; }
+  .scroll-thin::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+  .scroll-thin::-webkit-scrollbar-thumb:hover { background: #475569; }
+  pre { padding: 14px !important; border-radius: 6px !important; font-size: 12px !important; line-height: 1.55 !important; }
+  pre code { background: transparent !important; padding: 0 !important; }
+  .pulse-dot {
+    animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .agent-card {
+    transition: border-color 0.2s, transform 0.15s;
+  }
+  .agent-card:hover {
+    border-color: #3b82f6;
+    transform: translateY(-1px);
+  }
+  details > summary { list-style: none; cursor: pointer; }
+  details > summary::-webkit-details-marker { display: none; }
+  details[open] .chev { transform: rotate(90deg); }
+  .chev { transition: transform 0.15s; }
+</style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+
+<div id="app" class="flex h-screen overflow-hidden">
+
+  <!-- Sidebar -->
+  <aside class="w-64 bg-slate-900 border-r border-slate-800 flex flex-col">
+    <div class="p-5 border-b border-slate-800">
+      <div class="flex items-center gap-2.5">
+        <div class="w-8 h-8 rounded bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center font-bold text-sm">A</div>
+        <div>
+          <div class="font-semibold text-sm">ArchAI</div>
+          <div class="text-xs text-slate-400">Decision Engine</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Health -->
+    <div class="p-4 border-b border-slate-800">
+      <div class="text-[10px] font-semibold uppercase text-slate-500 tracking-wide mb-2">System</div>
+      <div id="health-panel" class="text-xs space-y-1.5">
+        <div class="flex items-center gap-1.5 text-slate-400">
+          <div class="w-1.5 h-1.5 rounded-full bg-slate-600 pulse-dot"></div>
+          <span>Connecting…</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tech stacks -->
+    <div class="flex-1 overflow-y-auto scroll-thin p-4">
+      <div class="text-[10px] font-semibold uppercase text-slate-500 tracking-wide mb-2">Knowledge Base</div>
+      <div id="techs-panel" class="space-y-1">
+        <div class="text-xs text-slate-500">Loading…</div>
+      </div>
+    </div>
+
+    <!-- Examples -->
+    <div class="p-4 border-t border-slate-800">
+      <div class="text-[10px] font-semibold uppercase text-slate-500 tracking-wide mb-2">Examples</div>
+      <div class="space-y-1.5">
+        <button onclick="useExample('I need a scalable Python REST API with async support and auto-generated docs')" class="w-full text-left text-xs text-slate-400 hover:text-blue-400 truncate">→ Scalable Python REST API</button>
+        <button onclick="useExample('Build a Node.js Express server with MongoDB for real-time chat')" class="w-full text-left text-xs text-slate-400 hover:text-blue-400 truncate">→ Node.js real-time chat</button>
+        <button onclick="useExample('Full-stack dashboard: React UI with NestJS TypeScript backend')" class="w-full text-left text-xs text-slate-400 hover:text-blue-400 truncate">→ Full-stack dashboard</button>
+        <button onclick="useExample('Django web app with admin panel for content management')" class="w-full text-left text-xs text-slate-400 hover:text-blue-400 truncate">→ Django CMS</button>
+        <button onclick="useExample('.NET Core microservices with React frontend')" class="w-full text-left text-xs text-slate-400 hover:text-blue-400 truncate">→ .NET + React</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main panel -->
+  <main class="flex-1 flex flex-col overflow-hidden">
+
+    <!-- Top bar with query input -->
+    <div class="border-b border-slate-800 bg-slate-900/50 backdrop-blur p-4">
+      <div class="max-w-5xl mx-auto">
+        <div class="flex gap-2">
+          <textarea
+            id="query"
+            placeholder="Describe your project… e.g. 'I need a scalable Python REST API with async support'"
+            rows="2"
+            class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-none"
+          ></textarea>
+          <button
+            id="submit-btn"
+            onclick="runQuery()"
+            class="bg-blue-600 hover:bg-blue-500 active:bg-blue-700 transition px-5 py-2.5 rounded-lg font-medium text-sm whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+          >
+            <span id="submit-label">Analyse</span>
+            <span id="submit-spinner" class="hidden">
+              <svg class="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" opacity="0.25"></circle>
+                <path d="M4 12a8 8 0 018-8v3" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path>
+              </svg>
+            </span>
+          </button>
+        </div>
+        <div class="mt-2 flex justify-between items-center text-xs">
+          <div class="text-slate-500">Press <kbd class="bg-slate-800 px-1.5 py-0.5 rounded text-[10px] mono">⌘ ↵</kbd> to submit</div>
+          <div id="status-line" class="text-slate-400"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div class="flex-1 overflow-y-auto scroll-thin">
+      <div id="results" class="max-w-5xl mx-auto p-6">
+        <div class="flex items-center justify-center h-96 text-center">
+          <div>
+            <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center">
+              <svg class="w-8 h-8 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+              </svg>
+            </div>
+            <div class="font-medium text-slate-300">Describe your project to get started</div>
+            <div class="text-sm text-slate-500 mt-1">ArchAI consults specialised agents and recommends a stack with reasoning</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+
+<script>
+const API = 'http://localhost:8000';
+
+// ─── Init ────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', async () => {
+  await loadHealth();
+  await loadTechs();
+
+  document.getElementById('query').addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') runQuery();
+  });
+});
+
+// ─── Sidebar: health ─────────────────────────────────────────────────────
+async function loadHealth() {
+  const panel = document.getElementById('health-panel');
+  try {
+    const r = await fetch(`${API}/api/health`);
+    const data = await r.json();
+    const ok = data.status === 'ok';
+    const provider = data.config?.agent_provider || '?';
+    const router = data.config?.router_model || '?';
+    const agent = data.config?.agent_model || '?';
+    const local = data.config?.fully_local;
+    panel.innerHTML = `
+      <div class="flex items-center gap-1.5">
+        <div class="w-1.5 h-1.5 rounded-full ${ok ? 'bg-emerald-400' : 'bg-amber-400'}"></div>
+        <span class="${ok ? 'text-emerald-400' : 'text-amber-400'}">${ok ? 'API healthy' : 'Degraded'}</span>
+      </div>
+      <div class="text-slate-500">Provider: <span class="text-slate-300">${provider}</span></div>
+      <div class="text-slate-500 truncate">Router: <span class="text-slate-300">${router.replace('groq/', '')}</span></div>
+      <div class="text-slate-500 truncate">Agent: <span class="text-slate-300">${agent.replace('groq/', '')}</span></div>
+      ${local !== undefined ? `<div class="text-slate-500">Mode: <span class="text-slate-300">${local ? 'Local' : 'Cloud'}</span></div>` : ''}
+    `;
+  } catch (e) {
+    panel.innerHTML = `
+      <div class="flex items-center gap-1.5">
+        <div class="w-1.5 h-1.5 rounded-full bg-red-500"></div>
+        <span class="text-red-400">API offline</span>
+      </div>
+      <div class="text-slate-500 mt-1 text-[10px]">Run: <code class="mono text-slate-400">uvicorn api:app --port 8000</code></div>
+    `;
+  }
+}
+
+// ─── Sidebar: tech stacks ────────────────────────────────────────────────
+async function loadTechs() {
+  const panel = document.getElementById('techs-panel');
+  try {
+    const r = await fetch(`${API}/api/techs`);
+    const data = await r.json();
+    panel.innerHTML = data.techs.map(t => {
+      const isPopulated = t.chunk_count > 0;
+      const dot = isPopulated ? 'bg-emerald-400' : 'bg-slate-700';
+      const txt = isPopulated ? 'text-slate-200' : 'text-slate-600';
+      return `
+        <div class="flex items-center justify-between text-xs py-1 px-2 rounded hover:bg-slate-800/50">
+          <div class="flex items-center gap-2 ${txt}">
+            <div class="w-1.5 h-1.5 rounded-full ${dot}"></div>
+            <span>${t.name}</span>
+          </div>
+          <span class="mono text-[10px] text-slate-500">${formatChunks(t.chunk_count)}</span>
+        </div>
+      `;
+    }).join('');
+  } catch (e) {
+    panel.innerHTML = `<div class="text-xs text-red-400">Failed to load</div>`;
+  }
+}
+function formatChunks(n) {
+  if (!n) return '—';
+  if (n >= 1000) return (n/1000).toFixed(1) + 'k';
+  return n.toString();
+}
+
+// ─── Examples ────────────────────────────────────────────────────────────
+function useExample(text) {
+  document.getElementById('query').value = text;
+  document.getElementById('query').focus();
+}
+
+// ─── Main: run query ─────────────────────────────────────────────────────
+async function runQuery() {
+  const queryEl = document.getElementById('query');
+  const query = queryEl.value.trim();
+  if (!query) {
+    queryEl.focus();
+    return;
+  }
+
+  const submitBtn = document.getElementById('submit-btn');
+  const submitLabel = document.getElementById('submit-label');
+  const submitSpinner = document.getElementById('submit-spinner');
+  const statusLine = document.getElementById('status-line');
+  const results = document.getElementById('results');
+
+  submitBtn.disabled = true;
+  submitLabel.textContent = 'Analysing…';
+  submitSpinner.classList.remove('hidden');
+  statusLine.textContent = 'Routing query to specialist agents…';
+
+  results.innerHTML = renderLoading();
+
+  const t0 = performance.now();
+  try {
+    const r = await fetch(`${API}/api/recommend`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query }),
+    });
+
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({ detail: r.statusText }));
+      throw new Error(err.detail || `HTTP ${r.status}`);
+    }
+
+    const data = await r.json();
+    const elapsed = ((performance.now() - t0) / 1000).toFixed(1);
+    statusLine.textContent = `Completed in ${elapsed}s · routed to ${data.routed_techs.length} agent(s)`;
+    results.innerHTML = renderResult(data);
+    document.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+  } catch (e) {
+    results.innerHTML = `
+      <div class="bg-red-950/30 border border-red-900 rounded-lg p-4">
+        <div class="font-medium text-red-300">Request failed</div>
+        <div class="text-sm text-red-400 mt-1 mono">${escapeHtml(e.message)}</div>
+        <div class="text-xs text-slate-400 mt-2">Make sure the API server is running at <code class="mono">${API}</code></div>
+      </div>
+    `;
+    statusLine.textContent = 'Failed';
+  } finally {
+    submitBtn.disabled = false;
+    submitLabel.textContent = 'Analyse';
+    submitSpinner.classList.add('hidden');
+  }
+}
+
+function renderLoading() {
+  return `
+    <div class="space-y-4">
+      <div class="bg-slate-900 border border-slate-800 rounded-lg p-6">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-2 h-2 rounded-full bg-blue-400 pulse-dot"></div>
+          <div class="text-sm text-slate-300">Specialist agents working…</div>
+        </div>
+        <div class="space-y-3">
+          ${[1,2,3].map(() => `
+            <div class="space-y-2">
+              <div class="h-3 bg-slate-800 rounded animate-pulse w-3/4"></div>
+              <div class="h-3 bg-slate-800 rounded animate-pulse w-1/2"></div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ─── Result renderer ─────────────────────────────────────────────────────
+function renderResult(data) {
+  const stack = data.recommended_stack || {};
+  const error = data.error
+    ? `<div class="bg-amber-950/30 border border-amber-900 rounded-lg p-3 text-sm text-amber-300">⚠ ${escapeHtml(data.error)}</div>`
+    : '';
+
+  return `
+    ${error}
+
+    <!-- Top metrics -->
+    <div class="grid grid-cols-4 gap-3 mb-5">
+      ${metricCard('Routed Techs', data.routed_techs?.length || 0, data.routed_techs?.join(', ') || '—')}
+      ${metricCard('Agents Run', data.agent_details?.length || 0, `${data.agent_details?.filter(a=>a.recommended).length || 0} recommended`)}
+      ${metricCard('Sources', data.sources?.length || 0, 'Documentation citations')}
+      ${metricCard('Code Examples', data.key_code_examples?.length || 0, 'Generated snippets')}
+    </div>
+
+    <!-- Summary -->
+    <div class="bg-slate-900 border border-slate-800 rounded-lg p-5 mb-5">
+      <div class="text-[10px] font-semibold uppercase text-slate-500 tracking-wide mb-2">Executive Summary</div>
+      <div class="text-sm text-slate-200 leading-relaxed">${escapeHtml(data.summary || 'No summary generated.')}</div>
+    </div>
+
+    <!-- Recommended stack badges -->
+    ${(stack.backend || stack.frontend || (stack.additional?.length)) ? `
+      <div class="bg-slate-900 border border-slate-800 rounded-lg p-5 mb-5">
+        <div class="text-[10px] font-semibold uppercase text-slate-500 tracking-wide mb-3">Recommended Stack</div>
+        <div class="flex flex-wrap gap-2">
+          ${stack.backend ? stackBadge('Backend', stack.backend, 'blue') : ''}
+          ${stack.frontend ? stackBadge('Frontend', stack.frontend, 'purple') : ''}
+          ${(stack.additional || []).map(t => stackBadge('Additional', t, 'slate')).join('')}
+        </div>
+      </div>
+    ` : ''}
+
+    <!-- Architecture overview -->
+    ${data.architecture_overview ? `
+      <div class="bg-slate-900 border border-slate-800 rounded-lg p-5 mb-5">
+        <div class="text-[10px] font-semibold uppercase text-slate-500 tracking-wide mb-2">Architecture Overview</div>
+        <div class="text-sm text-slate-300 leading-relaxed prose prose-invert max-w-none">${marked.parse(data.architecture_overview)}</div>
+      </div>
+    ` : ''}
+
+    <!-- Two-column: roadmap + code -->
+    <div class="grid grid-cols-2 gap-5 mb-5">
+
+      <!-- Roadmap -->
+      <div class="bg-slate-900 border border-slate-800 rounded-lg p-5">
+        <div class="text-[10px] font-semibold uppercase text-slate-500 tracking-wide mb-3">Implementation Roadmap</div>
+        ${(data.implementation_roadmap || []).length ? `
+          <div class="space-y-3">
+            ${data.implementation_roadmap.map((p, i) => `
+              <div class="flex gap-3">
+                <div class="w-6 h-6 flex-shrink-0 rounded bg-blue-600/20 text-blue-400 text-xs font-medium flex items-center justify-center">${p.phase || i+1}</div>
+                <div class="flex-1">
+                  <div class="text-sm font-medium text-slate-200">${escapeHtml(p.title || 'Phase')}</div>
+                  <ul class="mt-1 space-y-0.5">
+                    ${(p.tasks || []).map(t => `<li class="text-xs text-slate-400">• ${escapeHtml(t)}</li>`).join('')}
+                  </ul>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        ` : '<div class="text-xs text-slate-500">No roadmap generated.</div>'}
+      </div>
+
+      <!-- Code examples -->
+      <div class="bg-slate-900 border border-slate-800 rounded-lg p-5 overflow-hidden">
+        <div class="text-[10px] font-semibold uppercase text-slate-500 tracking-wide mb-3">Key Code Examples</div>
+        ${(data.key_code_examples || []).length ? `
+          <div class="space-y-3 max-h-96 overflow-y-auto scroll-thin">
+            ${data.key_code_examples.map(ex => `
+              <div>
+                <div class="text-xs text-slate-400 mb-1.5"><span class="mono text-blue-400">${escapeHtml(ex.tech || '')}</span> · ${escapeHtml(ex.title || '')}</div>
+                <pre><code class="mono">${escapeHtml(ex.code || '')}</code></pre>
+              </div>
+            `).join('')}
+          </div>
+        ` : '<div class="text-xs text-slate-500">No code examples generated.</div>'}
+      </div>
+    </div>
+
+    <!-- Per-agent details -->
+    <div class="bg-slate-900 border border-slate-800 rounded-lg p-5 mb-5">
+      <div class="text-[10px] font-semibold uppercase text-slate-500 tracking-wide mb-3">Specialist Agent Analyses</div>
+      <div class="space-y-3">
+        ${(data.agent_details || []).map(a => renderAgentCard(a)).join('')}
+      </div>
+    </div>
+
+    <!-- Alternative + Sources -->
+    <div class="grid grid-cols-2 gap-5 mb-5">
+      ${data.alternative_consideration ? `
+        <div class="bg-slate-900 border border-slate-800 rounded-lg p-5">
+          <div class="text-[10px] font-semibold uppercase text-slate-500 tracking-wide mb-2">Alternative Consideration</div>
+          <div class="text-xs text-slate-400 leading-relaxed">${escapeHtml(data.alternative_consideration)}</div>
+        </div>
+      ` : '<div></div>'}
+
+      <div class="bg-slate-900 border border-slate-800 rounded-lg p-5">
+        <div class="text-[10px] font-semibold uppercase text-slate-500 tracking-wide mb-2">Sources (${data.sources?.length || 0})</div>
+        ${data.sources?.length ? `
+          <div class="space-y-1 max-h-40 overflow-y-auto scroll-thin">
+            ${data.sources.map(s => `
+              <a href="${escapeHtml(s)}" target="_blank" rel="noopener" class="block text-xs text-blue-400 hover:text-blue-300 truncate">${escapeHtml(s)}</a>
+            `).join('')}
+          </div>
+        ` : '<div class="text-xs text-slate-500">No sources cited.</div>'}
+      </div>
+    </div>
+  `;
+}
+
+function renderAgentCard(a) {
+  const conf = (a.confidence || 0);
+  const pct = Math.round(conf * 100);
+  const color = a.recommended ? 'emerald' : 'slate';
+  const recBadge = a.recommended
+    ? '<span class="text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded font-medium">RECOMMENDED</span>'
+    : '<span class="text-[10px] bg-slate-700 text-slate-400 px-1.5 py-0.5 rounded font-medium">NOT RECOMMENDED</span>';
+
+  return `
+    <details class="agent-card bg-slate-950 border border-slate-800 rounded-lg overflow-hidden">
+      <summary class="px-4 py-3 flex items-center justify-between hover:bg-slate-900/50">
+        <div class="flex items-center gap-3">
+          <svg class="chev w-3 h-3 text-slate-500" fill="currentColor" viewBox="0 0 12 12"><path d="M4 2l4 4-4 4z"/></svg>
+          <div class="font-medium text-sm text-slate-200">${escapeHtml(a.tech_name || a.tech_id)}</div>
+          ${recBadge}
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="text-xs text-slate-500">Confidence</div>
+          <div class="w-24 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+            <div class="h-full bg-${color}-500" style="width: ${pct}%"></div>
+          </div>
+          <div class="text-xs text-slate-300 mono w-9 text-right">${pct}%</div>
+        </div>
+      </summary>
+      <div class="px-4 pb-4 pt-2 border-t border-slate-800/50 space-y-3">
+        ${a.error ? `<div class="text-xs text-red-400 bg-red-950/30 rounded p-2">⚠ ${escapeHtml(a.error)}</div>` : ''}
+
+        ${a.reason ? `
+          <div>
+            <div class="text-[10px] font-semibold uppercase text-slate-500 tracking-wide mb-1">Reasoning</div>
+            <div class="text-sm text-slate-300 leading-relaxed">${escapeHtml(a.reason)}</div>
+          </div>
+        ` : ''}
+
+        ${a.architecture_notes ? `
+          <div>
+            <div class="text-[10px] font-semibold uppercase text-slate-500 tracking-wide mb-1">Architecture Notes</div>
+            <div class="text-xs text-slate-400 leading-relaxed">${escapeHtml(a.architecture_notes)}</div>
+          </div>
+        ` : ''}
+
+        ${(a.pros?.length || a.cons?.length) ? `
+          <div class="grid grid-cols-2 gap-3">
+            ${a.pros?.length ? `
+              <div>
+                <div class="text-[10px] font-semibold uppercase text-emerald-500 tracking-wide mb-1">Pros</div>
+                <ul class="space-y-1">
+                  ${a.pros.map(p => `<li class="text-xs text-slate-300">+ ${escapeHtml(p)}</li>`).join('')}
+                </ul>
+              </div>
+            ` : ''}
+            ${a.cons?.length ? `
+              <div>
+                <div class="text-[10px] font-semibold uppercase text-amber-500 tracking-wide mb-1">Cons</div>
+                <ul class="space-y-1">
+                  ${a.cons.map(c => `<li class="text-xs text-slate-400">− ${escapeHtml(c)}</li>`).join('')}
+                </ul>
+              </div>
+            ` : ''}
+          </div>
+        ` : ''}
+
+        ${a.code_example ? `
+          <div>
+            <div class="text-[10px] font-semibold uppercase text-slate-500 tracking-wide mb-1">Code Example</div>
+            <pre><code class="mono">${escapeHtml(a.code_example)}</code></pre>
+          </div>
+        ` : ''}
+      </div>
+    </details>
+  `;
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────
+function metricCard(label, value, subtext) {
+  return `
+    <div class="bg-slate-900 border border-slate-800 rounded-lg p-4">
+      <div class="text-[10px] font-semibold uppercase text-slate-500 tracking-wide">${label}</div>
+      <div class="text-2xl font-semibold text-slate-100 mt-1">${value}</div>
+      <div class="text-[11px] text-slate-500 mt-0.5 truncate" title="${escapeHtml(subtext)}">${escapeHtml(subtext)}</div>
+    </div>
+  `;
+}
+
+function stackBadge(label, tech, color) {
+  const colorMap = {
+    blue: 'bg-blue-500/15 text-blue-300 border-blue-700/40',
+    purple: 'bg-purple-500/15 text-purple-300 border-purple-700/40',
+    slate: 'bg-slate-800 text-slate-300 border-slate-700',
+  };
+  return `
+    <div class="border ${colorMap[color]} rounded-lg px-3 py-2 flex flex-col">
+      <span class="text-[9px] font-semibold uppercase tracking-wide opacity-70">${label}</span>
+      <span class="text-sm font-medium mono mt-0.5">${escapeHtml(tech)}</span>
+    </div>
+  `;
+}
+
+function escapeHtml(s) {
+  if (s === null || s === undefined) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+</script>
+</body>
+</html>
